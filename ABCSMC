@@ -1,0 +1,68 @@
+ABCSMC <- function(testname, farm, Nrounds, Nsuc, Nw){
+  #Initialisation
+  dt<-1/24
+  Model <- 1
+  Data_Infected<- c(38, 44, 36, 54, 14)
+  Data_Pop <- c(38, 49, 47, 54, 16)
+  Data_age <- c(10, 7, 5, 10, 5)
+  Age<- Data_age[farm]
+  
+  #Individual farm data
+  Data_clin<-list(c(1, 0, 13, 8, 10, 1, 3, 2, 0, 0),
+                  c(1, 8, 7, 5, 8, 13, 2),
+                  c(3, 2, 11, 17, 3),
+                  c(5, 3, 12, 13, 19, 2, 0, 0, 0, 0),
+                  c(2, 4, 4, 3, 1))
+  
+output_inc_prior<-Load_parameters(0)
+Par <- cbind(output_inc_prior$ParVp,output_inc_prior$ParTr)
+Parameter_estimates<-Prior_dist_fitting(Par,0,'NA','NA',Model)
+eta<-abs(max(Par)-min(Par))*0.1 #length or std dev of the pertubation kernel
+N=Data_Pop[farm] #set herd size
+
+eps = 5*N*Age # Set an initial (large) value for episilon
+
+#set number of maximum days for the simulation to run for - This comes
+#into effect if no animals show clinical signs this time
+
+Maxdays=100
+Thetap<-list(NA)
+
+for (n in 1:Nw){
+#first round
+Dp=matrix(data=1,nrow = ceiling(Nsuc/Nw))
+wp=matrix(data=1,nrow = ceiling(Nsuc/Nw))
+Thetap[[n]]=list(NA)
+i <- 1
+betaD <- matrix(data=0,ncol=ncol(Par))
+
+
+while (i <= ceil(Nsuc/Nw)){
+  
+  betaD=Par[sample(20000,1), ] #randomly choose from prior data
+  
+  #if uniform priors are chosen, then randomly generate from the given interval
+  
+  for (p in 1:ncol(Par)){
+    
+    if (pardis[p]=="uniform"){
+    betaD[p]= runif(1)*Parameter_estimates$dpar[[p]][1]+Parameter_estimates$dpar[[p]][2]
+  }
+  }
+}
+
+Ni00=sample(N,1)
+
+#Viral_profile
+
+viral_profile_output<-viral_profile(betaD[1:11],N,Maxdays,dt)
+if (Maxdays > ceiling(viral_profile_output$Ti[1,2])+Age+1){
+  #Set the number of days depending on how long for clinical signs to appear
+Ndays <- ceiling(viral_profile_output$Ti[1,2])+Age+1
+#Run the transmission model
+Transmission_model_output <- Transmission_model(N,Ndays,dr,betaD(,12:21),Ni00,0,VP,Ti,Esize)
+  }
+
+while (beta1[11]< (-1)| beta1[11]>1| min (beta[3,4,9,10,12:21])<0|Priorprob<=0){
+  pert<-runif(length(Par))*eta
+}
