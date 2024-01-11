@@ -1,0 +1,94 @@
+##Libraries necessary to run model
+
+library("EnvStats")
+library("ismev")
+library("evd")
+library("mclust")
+library("R.matlab")
+library("MASS")
+
+
+##Changeable parameters
+
+Ntrials <- 10 #number of simulations
+Ndays <- 40 #number of days
+dt <- 1/24 #time interval for calculating shedding levels
+
+dataset=1 #parameter dataset - 0=priors, 1-5=posterior from farms 1-5, 6= no env. size, farm 1
+
+if (dataset>0){
+#Overall farm data:
+Data_Infected <- c(38, 44, 36, 54, 14)
+Data_Pop <- c(38, 49, 47, 54, 16)
+Data_age <- c(10, 7, 5, 10, 5)
+
+#Individual farm data
+Data_clin <- list(c(1, 0, 13, 8, 10, 1, 3, 2, 0, 0),
+                  c(1, 8, 7, 5, 8, 13, 2),
+                  c(3, 2, 11, 17, 3),
+                  c(5, 3, 12, 13, 19, 2, 0, 0, 0, 0),
+                  c(2, 4, 4, 3, 1),
+                  c(2, 4, 4, 3, 1))
+
+if (dataset < 6){
+  N <- Data_Pop [dataset]
+}else {
+  N=38
+}
+}
+
+#Uncomment the below to choose a different herd size
+N <- 50 #Number of animals
+
+if (dataset == 6){
+  Esize <- 1
+} else {
+  Esize <- N
+}
+
+Insp <- #Days between inspections
+  Ninsp <- 3 #Number of animals inspected
+Nsamp <- 5 #Number of samples on each part of the environment
+
+betaD <- 1 #Probability of infection through interaction
+betaE <- 1 #Probability of infection through the environment
+
+#Load parameters
+
+Trans_parameters <- Load_parameters(dataset)
+Trans_parameters$ParTr[,1] <- Trans_parameters$ParTr[,1]*betaD
+Trans_parameters$ParTr[,2] <- Trans_parameters$ParTr[,2]*betaE
+
+#Initial conditions
+Ni0 <- (Trans_parameters$Ni0prior) #Initial infected
+#Uncomment the below to set different initial conditions for infected animals
+#Ni0 <- 1*rep(1,20000)
+E0 <- c(0,0,0,0)
+
+if (dataset == 6){
+  dataset <- 1
+}
+
+##Run model of transmission
+
+k <- 1
+samp_index<-vector("list", length=0)
+V_profile_list<-vector("list",length=0)
+
+while (k <= Ntrials){
+  V_profile_list[[k]] <- viral_profile(Trans_parameters$ParVp, N, Ndays, dt)
+  samp_index[[k]]<-(V_profile_list[[k]]$samp)
+  transmission_output <- transmission_model(N=N, Ndays=Ndays, dt=dt, ParTr=V_profile_list[[k]]$samp, Ni0=Ni0[[V_profile_list[[k]]$samp]],
+                                            E0=E0, VP=V_profile_list$VP,V_profile_list$Ti, Esize=Esize)
+  
+if (dataset>0 & Cfirst[[k]]<Ndays/dt-Data_age[[dataset]]/dt){
+    Cs1 <- Cs[seq(from=1/dt,to=Ndays/dt,by=1/dt),k]
+    if (Cfirst[[k]]>1/dt){
+      Inffit[,k] <- Cs1[[ceiling(Cfirst[[k]]*dt)]]-1:ceiling[[Cfirst[[k]]*k]]-1+Data_age[[dataset]]]]
+    }else(Inffit[,k]=c(0,Cs1[[seq(1:Data_age(dataset))]]){
+    if (Ni[[nrow(max),k]]>N/2){
+  k<-k+1
+    }
+    }
+    }
+}
