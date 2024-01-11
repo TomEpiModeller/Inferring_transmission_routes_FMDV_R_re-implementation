@@ -1,0 +1,31 @@
+ 
+  #randomly generate a sample number
+  
+  samp <- sample(nrow(Vp), 1)
+  
+  
+  #calculate Vp
+  mean_vector <- c(tp[samp, 1], Tc[samp, 1])
+  covariance_matrix <- matrix(c(tp[samp, 2]^2, rho[samp] * tp[samp, 2] * Tc[samp, 2],
+                                rho[samp] * tp[samp, 2] * Tc[samp, 2], Tc[samp, 2]^2), 
+                              nrow = 2, ncol = 2)
+  
+  Ti <- exp(mvrnorm(N, mean_vector, covariance_matrix))
+  Vpi <- exp(rgamma(N, Vp[samp, 1], Vp[samp, 2]/Vp[samp, 1]))
+  gammadi <- rgamma(N, ld[samp, 1], ld[samp, 2]/ld[samp, 1])
+  gammagi <- rgamma(N, lg[samp, 1], lg[samp, 2]/lg[samp, 1])
+  
+  #Create list object to mitigate lack of array broadcasting
+  
+  Ti_list <- lapply(1:length(tau), function(x)Ti)
+  
+  Ti_combined <- do.call(rbind, Ti_list)
+  
+  Ti_df <- as.data.frame(Ti_combined)
+  
+  #Calculate viral profile for each animal
+  
+  VP <- 2 * Vpi / (exp(-gammagi * (tau - Ti_df[, 1])) + exp(gammadi * (tau - Ti_df[, 1])))
+  viral_profiles <- list(VP = VP, Ti = Ti, samp = samp)
+  return(viral_profiles)
+}
