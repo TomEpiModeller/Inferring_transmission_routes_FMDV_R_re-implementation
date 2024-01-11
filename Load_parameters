@@ -1,0 +1,43 @@
+#function [ParVp, ParTr, Ni0prior]=Load_parameters(dataset)
+#install "R.matlab" if needed
+Load_parameters<-function(dataset){
+
+  if (dataset == 0) {
+    #Load data for priors
+    varload <- readMat("M://MATLAB experiments//Transmission model (direct+environmental)//Data//SimplePhenomModel_VirusDynOnly_MCMCSamples.mat")
+    Vp <- rbind(varload$ParSamp[[1]][[1]][,61:62], varload$ParSamp[[2]][[1]][, 61:62])
+    tp <- rbind(varload$ParSamp[[1]][[1]][, 63:64], varload$ParSamp[[2]][[1]][, 63:64])
+    lg <- rbind(varload$ParSamp[[1]][[1]][, 65:66], varload$ParSamp[[2]][[1]][, 65:66])
+    ld <- rbind(varload$ParSamp[[1]][[1]][, 67:68], varload$ParSamp[[2]][[1]][, 67:68])
+    Tc <- c(varload$ParSamp[[1]][[1]][, 69], varload$ParSamp[[2]][[1]][, 69])
+    sTc <- c(varload$ParSamp[[1]][[1]][, 70], varload$ParSamp[[2]][[1]][, 70])
+    rho <- c(varload$ParSamp[[1]][[1]][, 71], varload$ParSamp[[2]][[1]][, 71])
+    
+    varload <- readMat("M://MATLAB experiments//Transmission model (direct+environmental)//Data//EnvTrans_SimpleModel21_MCMCSamples.mat")
+    alpha <- rbind(exp(varload$ParSamp[[3]][[1]][,76:79]), exp(varload$ParSamp[[3]][[1]][,76:79]))
+    delta <- rbind(exp(varload$ParSamp[[3]][[1]][,80:83]), exp(varload$ParSamp[[3]][[1]][,80:83]))
+    betaE <- rbind(as.data.frame(exp(varload$ParSamp[[3]][[1]][,84])),as.data.frame(exp(varload$ParSamp[[3]][[1]][,84])))
+    
+    varload <- readMat("M://MATLAB experiments//Transmission model (direct+environmental)//Data//SimpleWithinHostModelToo2_NF_MCMCSamples.mat")
+    betaD <- exp(c(varload$ParSamp[[1]][[1]][,ncol(varload$ParSamp[[1]][[1]])-3], varload$ParSamp[[2]][[1]][,ncol(varload$ParSamp[[1]][[1]])-3]))/log(10)
+    
+    ParVp <- data.frame(Vp,tp,lg,ld,Tc,sTc,rho)
+    ParTr <- data.frame(betaD,betaE,alpha,delta)
+    
+    Ni0prior <- rep(1,20000)
+  } else if (dataset < 6) {
+    priorframe<-readMat("M://MATLAB experiments//Transmission model (direct+environmental)//Data//PosteriorDistributions.mat")
+    Pars=priorframe$Post[,,dataset]
+    ParVp=Pars[,1:11]
+    ParTr=Pars[,12:(ncol(Pars))]
+    Ni0prior=priorframe$Ni0post[,1,dataset]
+  } else if (dataset == 6){ #Load data for A=1 scenario for farm 1
+    priorscenario6<-readMat("M://MATLAB experiments//Transmission model (direct+environmental)//Data//Posteriors_A1_farm1.mat")
+    Pars <- c(priorscenario6$Theta[[length(priorscenario6$Theta)]], priorscenario6$Theta[[length(priorscenario6$Theta)]])
+    ParVp <- Pars[[1]][, 1:11]
+    ParTr <- Pars[[1]][, 12:ncol(Pars[[1]])]
+    Ni0prior <- c(priorscenario6$Ni0[,ncol(priorscenario6$Ni0)], priorscenario6$Ni0[,ncol(priorscenario6$Ni0)])
+  }
+  load_output_list<-list(ParVp=ParVp,ParTr=ParTr,Ni0prior=Ni0prior)
+  return(load_output_list)
+}
