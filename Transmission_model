@@ -39,7 +39,7 @@ Transmission_model<-function(N, Ndays, dt, ParTr, Ni0, E0, VP, Ti, Esize){
     if (dailyI[j]>0){
       for (i in t(NewI)){
         Ti <- V_profile_list[[1]]$Ti
-        V[i, (j:(Nt + 1))] <- VP[i, (1:(Nt - j + 2))]
+        V[i, (j:(Nt + 1))] <- VP[ ((i-1)*Nt + 1) : ((i-1)*Nt + Nt - j + 2)]
         C[i,(j+ceiling(V_profile_list[[i]]$Ti[,2]/dt):(Nt))] <- 1
       }
       #Infectiousness is assumed to be proportional to log titre
