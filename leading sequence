@@ -74,21 +74,23 @@ if (dataset == 6){
 k <- 1
 samp_index<-vector("list", length=0)
 V_profile_list<-vector("list",length=0)
-
+transmission_k_store<-vector("list",length=0)
+Inffit<-vector("list",length=0)
 while (k <= Ntrials){
   V_profile_list[[k]] <- viral_profile(Trans_parameters$ParVp, N, Ndays, dt)
   samp_index[[k]]<-(V_profile_list[[k]]$samp)
-  transmission_output <- transmission_model(N=N, Ndays=Ndays, dt=dt, ParTr=V_profile_list[[k]]$samp, Ni0=Ni0[[V_profile_list[[k]]$samp]],
-                                            E0=E0, VP=V_profile_list$VP,V_profile_list$Ti, Esize=Esize)
-  
-if (dataset>0 & Cfirst[[k]]<Ndays/dt-Data_age[[dataset]]/dt){
-    Cs1 <- Cs[seq(from=1/dt,to=Ndays/dt,by=1/dt),k]
-    if (Cfirst[[k]]>1/dt){
-      Inffit[,k] <- Cs1[[ceiling(Cfirst[[k]]*dt)]]-1:ceiling[[Cfirst[[k]]*k]]-1+Data_age[[dataset]]]]
-    }else(Inffit[,k]=c(0,Cs1[[seq(1:Data_age(dataset))]]){
-    if (Ni[[nrow(max),k]]>N/2){
+  transmission_output <- Transmission_model(N=N, Ndays=Ndays, dt=dt, ParTr=Trans_parameters$ParTr, Ni0=Ni0[[V_profile_list[[k]]$samp]],
+                                            E0=E0, VP=V_profile_list[[k]]$VP,Ti=V_profile_list$Ti, Esize=Esize)
+  transmission_k_store[[k]]<-transmission_output
+if (dataset>0 & transmission_k_store[[k]]$Cfirst<Ndays/dt-Data_age[[dataset]]/dt){
+    Cs1 <- transmission_k_store[[k]]$Cs[seq(from=1/dt,to=Ndays/dt,by=1/dt)]
+    if (transmission_k_store[[k]]$Cfirst>1/dt){
+      Inffit[[k]] <- Cs1[ceiling(transmission_k_store[[k]]$Cfirst*dt-1):ceiling(transmission_k_store[[k]]$Cfirst*dt-1+Data_age[[dataset]])]
+    }else{
+      Inffit[[k]] <- c(0,Cs1[seq(1:Data_age[[dataset]])])
+       }
+    if (Ni[[nrow(Ni),k]]>N/2){
   k<-k+1
     }
     }
     }
-}
