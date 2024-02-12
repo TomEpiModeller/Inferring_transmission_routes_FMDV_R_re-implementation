@@ -6,6 +6,7 @@ library("evd")
 library("mclust")
 library("R.matlab")
 library("MASS")
+library("pracma")
 
 
 ##Changeable parameters
@@ -89,8 +90,48 @@ if (dataset>0 & transmission_k_store[[k]]$Cfirst<Ndays/dt-Data_age[[dataset]]/dt
     }else{
       Inffit[[k]] <- c(0,Cs1[seq(1:Data_age[[dataset]])])
        }
-    if (Ni[[nrow(Ni),k]]>N/2){
+    if (max(transmission_k_store[[k]]$Ni)>N/2){
   k<-k+1
     }
-    }
-    }
+}
+}
+
+
+xp <- seq(from=0,to=Ndays,by=dt)
+Tgd<-lapply(transmission_k_store,function(x) trapz(xp,t(x$TotInf*xp))/trapz(xp,x$TotInf*xp))
+Tge<-lapply(transmission_k_store, function(x) trapz(xp,t(rowSums(x$E*xp)))/trapz(xp,rowSums(x$E)*xp))
+
+Esum<- lapply(transmission_k_store, function(x) rowSums(x$E) / 0.56)
+
+ThetaS<-vector("list",length=Ntrials)
+ThetaE<-vector("list",length=Ntrials)
+
+for (k in 1:Ntrials){
+  if (transmission_k_store[[k]]$Cfirst-1/dt<=1){
+    ThetaS[[k]][[1]]<-0
+    ThetaE[[k]][[1]]<-0
+  }else{
+    ThetaS[[k]][[1]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst-1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst-1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf),dt),transmission_k_store[[k]]$TotInf)
+    ThetaE[[k]][[1]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(transmission_k_store[[k]]$Cfirst-1)/dt]),dt),Esum[[k]][1:(transmission_k_store[[k]]$Cfirst-1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  }
+  ThetaS[[k]][[2]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst)]),dt),transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst)])/trapz(seq(dt,length(transmission_k_store[[k]]$TotInf)*dt,dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[2]]<-trapz(seq(dt,dt*length(Esum[[k]][1:transmission_k_store[[k]]$Cfirst]),dt),Esum[[k]][1:(transmission_k_store[[k]]$Cfirst)])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[3]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+1)/dt])/trapz(seq(dt,length(transmission_k_store[[k]]$TotInf)*dt,dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[3]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+1)/dt]),dt),Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[4]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+2)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+2)/dt])/trapz(seq(dt,length(transmission_k_store[[k]]$TotInf)*dt,dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[4]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+2)/dt]),dt),Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+2)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[5]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+5)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+5)/dt])/trapz(seq(dt,length(transmission_k_store[[k]]$TotInf)*dt,dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[5]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+5)/dt]),dt),Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+5)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[6]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+10)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(transmission_k_store[[k]]$Cfirst+10)/dt])/trapz(seq(dt,length(transmission_k_store[[k]]$TotInf)*dt,dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[6]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+10)/dt]),dt),Esum[[k]][1:(transmission_k_store[[k]]$Cfirst+10)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  
+  ThetaS[[k]][[7]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.05*N)[1]+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.05*N)[1]+1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf*dt),dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[7]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.05*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.05*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[8]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.1*N)[1]+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.1*N)[1]+1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf*dt),dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[8]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.1*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.1*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[9]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf*dt),dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[9]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaS[[k]][[10]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf*dt),dt),transmission_k_store[[k]]$TotInf)
+  ThetaE[[k]][[9]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  }
+
