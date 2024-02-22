@@ -10,6 +10,6 @@ To get the Direct+Environmental model working:
 
 4. Rename the necessary files in "Load_parameters" function in the function script.
 
-5. Rename the source call in the irect+Environmental Model.
+5. Rename the source call in the Direct+Environmental Model.
 
 6. Run the model.
