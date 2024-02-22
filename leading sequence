@@ -11,11 +11,13 @@ library("pracma")
 
 ##Changeable parameters
 
-Ntrials <- 10 #number of simulations
+Ntrials <- 10000 #number of simulations
 Ndays <- 40 #number of days
 dt <- 1/24 #time interval for calculating shedding levels
+Modelselect <- 1 #1 both; 2 direct (not functional yet)
 
-dataset=1 #parameter dataset - 0=priors, 1-5=posterior from farms 1-5, 6= no env. size, farm 1
+
+dataset=5 #parameter dataset - 0=priors, 1-5=posterior from farms 1-5, 6= no env. size, farm 1
 
 if (dataset>0){
 #Overall farm data:
@@ -29,7 +31,7 @@ Data_clin <- list(c(1, 0, 13, 8, 10, 1, 3, 2, 0, 0),
                   c(3, 2, 11, 17, 3),
                   c(5, 3, 12, 13, 19, 2, 0, 0, 0, 0),
                   c(2, 4, 4, 3, 1),
-                  c(2, 4, 4, 3, 1))
+                  c(1, 0, 13, 8, 10, 1, 3, 2, 0, 0))
 
 if (dataset < 6){
   N <- Data_Pop [dataset]
@@ -39,7 +41,7 @@ if (dataset < 6){
 }
 
 #Uncomment the below to choose a different herd size
-N <- 50 #Number of animals
+#N <- 50 #Number of animals
 
 if (dataset == 6){
   Esize <- 1
@@ -48,7 +50,7 @@ if (dataset == 6){
 }
 
 Insp <- #Days between inspections
-  Ninsp <- 3 #Number of animals inspected
+Ninsp <- 3 #Number of animals inspected
 Nsamp <- 5 #Number of samples on each part of the environment
 
 betaD <- 1 #Probability of infection through interaction
@@ -62,6 +64,7 @@ Trans_parameters$ParTr[,2] <- Trans_parameters$ParTr[,2]*betaE
 
 #Initial conditions
 Ni0 <- (Trans_parameters$Ni0prior) #Initial infected
+
 #Uncomment the below to set different initial conditions for infected animals
 #Ni0 <- 1*rep(1,20000)
 E0 <- c(0,0,0,0)
@@ -77,25 +80,34 @@ samp_index<-vector("list", length=0)
 V_profile_list<-vector("list",length=0)
 transmission_k_store<-vector("list",length=0)
 Inffit<-vector("list",length=0)
+
 while (k <= Ntrials){
   V_profile_list[[k]] <- viral_profile(Trans_parameters$ParVp, N, Ndays, dt)
   samp_index[[k]]<-(V_profile_list[[k]]$samp)
+  if(Modelselect == 1){
   transmission_output <- Transmission_model(N=N, Ndays=Ndays, dt=dt, ParTr=Trans_parameters$ParTr, Ni0=Ni0[[V_profile_list[[k]]$samp]],
                                             E0=E0, VP=V_profile_list[[k]]$VP,Ti=V_profile_list$Ti, Esize=Esize)
   transmission_k_store[[k]]<-transmission_output
+  }else{
+    Direct_output<-Direct_model(N=N,Ndays=Ndays,numsim=k, dt=dt,ParTr=Trans_parameters$ParTr,Ni0=Ni0[[V_profile_list[[k]]$samp]],VP=V_profile_list[[k]]$VP,Ti=V_profile_list$Ti)
+    transmission_k_store[[k]]<-Direct_output
+  }
 if (dataset>0 & transmission_k_store[[k]]$Cfirst<Ndays/dt-Data_age[[dataset]]/dt){
     Cs1 <- transmission_k_store[[k]]$Cs[seq(from=1/dt,to=Ndays/dt,by=1/dt)]
     if (transmission_k_store[[k]]$Cfirst>1/dt){
       Inffit[[k]] <- Cs1[ceiling(transmission_k_store[[k]]$Cfirst*dt-1):ceiling(transmission_k_store[[k]]$Cfirst*dt-1+Data_age[[dataset]])]
     }else{
-      Inffit[[k]] <- c(0,Cs1[seq(1:Data_age[[dataset]])])
-       }
+      Inffit[[k]] <- c(0,transmission_k_store[[k]]$Cs1[seq(1:Data_age[[dataset]])])
+    }
+}
     if (max(transmission_k_store[[k]]$Ni)>N/2){
   k<-k+1
     }
-}
+
 }
 
+
+#Calculate thetas if needed
 
 xp <- seq(from=0,to=Ndays,by=dt)
 Tgd<-lapply(transmission_k_store,function(x) trapz(xp,t(x$TotInf*xp))/trapz(xp,x$TotInf*xp))
@@ -132,6 +144,38 @@ for (k in 1:Ntrials){
   ThetaS[[k]][[9]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf*dt),dt),transmission_k_store[[k]]$TotInf)
   ThetaE[[k]][[9]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.2*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
   ThetaS[[k]][[10]]<-trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt]),dt),transmission_k_store[[k]]$TotInf[1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt])/trapz(seq(dt,dt*length(transmission_k_store[[k]]$TotInf*dt),dt),transmission_k_store[[k]]$TotInf)
-  ThetaE[[k]][[9]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
+  ThetaE[[k]][[10]]<-trapz(seq(dt,dt*length(Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt]),dt),Esum[[k]][1:(which(transmission_k_store[[k]]$Cfirst>0.5*N)[1]+1)/dt])/trapz(seq(dt,dt*length(Esum[[k]]),dt),Esum[[k]])
   }
+
+
+
+# Plotting
+library(ggplot2)
+
+# Convert Inffit to a data_frame
+df <- do.call(rbind,Inffit)
+
+#Estimate the number of new clinical signs per day
+df_mod<-df[,-1]-df[,-ncol(df)]
+df_mod_plot<-df_mod[-1,]
+
+# Create a data frame for plotting
+plot_data <- data.frame(
+  xp = (1:(ncol(df_mod_plot))),
+  Data_clin_dataset = rev(Data_clin[[dataset]]),
+  median = rev(apply(df_mod_plot, 2, median)),
+  lower = rev(apply(df_mod_plot, 2, function(x) quantile(x, 0.05))),
+  upper = rev(apply(df_mod_plot, 2, function(x) quantile(x, 0.95)))
+)
+
+# Plot using ggplot2
+ggplot(plot_data, aes(x = xp)) +
+  geom_bar(aes(y = Data_clin_dataset), stat = "identity", fill = "blue") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), color = "red", width = 0.2, position = position_dodge(0.9)) +
+  geom_point(aes(y=median),color="red",size=1)+
+  labs(x = "Lesion age (days)", y = "Number of cattle") +
+  ylim(0, N) +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12), axis.title = element_text(size = 14))
+
 
