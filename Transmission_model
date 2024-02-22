@@ -32,51 +32,53 @@ for (j in 1:Nt){
   S <- as.matrix(State[which(State[,j]==0),j])
   Ns <- size(S,1)
   Infd <- as.matrix(State[which(State[,j]==1),j])
-  Ni[j] <- size(Infd,1)
+  Ni[[j]] <- size(Infd,1)
   State[,j+1] <- State[,j]
 
   #For newly infected animals, calculate their viral titre in each compartment
   #and their shedding profile from day of infection to the end of the simulation
   if (dailyI[j]>0){
     for (i in t(NewI)){
-      Ti <- V_profile_list[[1]]$Ti
-      V[i, (j:(Nt + 1))] <- VP[ ((i-1)*Nt + 1) : ((i-1)*Nt + Nt - j + 2)]
-      if(j+ceiling(V_profile_list[[1]]$Ti[i,2]/dt)<=Nt){
+      V[i, (j:(Nt + 1))] <- VP[ i, 1:(Nt-j+2)]
       C[i,(j+ceiling(V_profile_list[[1]]$Ti[i,2]/dt)):(Nt)] <- 1
       }
-    }
     #Infectiousness is assumed to be proportional to log titre
     Infectiousness[NewI,] <- pmax(0,log(V[NewI,]))
-  }
+    }
+  
   #Calculate environmental contamination - 0.56 accounts for unit conversion
   
   E[j+1,] = E[j,] - delta*dt*E[j,] + alpha*dt*sum(pmax(0,log(0.56*V[,j])))/Esize
-  #New infections
+ 
+   #New infections
   if ((Ni[[j]])<N & (j<Nt-1)){ #If there are still uninfected animals in the herd
     
     #Environmental transmission (homogenous for each type of contamination)
     ProbE[[j]] <- 1-exp(-betaE*dt*sum((E[j+1,])+E[j,])/2)
-    # Remove NaN values from ProbE[[j]]
-    #ProbE[[j]] <- ProbE[[j]][!is.nan(ProbE[[j]])]
     Einf <- runif(Ns) < ProbE[[j]]
     #Direct transmission
-    ProbD[[j]] <- 1 - exp(-beta*dt*(mean((Infectiousness[,j+1]+Infectiousness[,j]))/2))
+    ProbD[[j]] <- 1 - exp(-beta*dt*(mean((Infectiousness[,j+1]+Infectiousness[,j])/2)))
     Dinf <- runif(Ns) < ProbD[[j]] #Generate new infections of susceptible animals
     
     #Record the route of infection and time
+    if(length(2*Einf+Dinf)>0){
     InfCause[1:size(S,1),1] <- 2*Einf+Dinf # 1=direct, 2=environmental, 3=both
     InfCause[1:length(S),2] <- j*dt
-    
+    }else{
+      InfCause[1:size(S,1),1]<-NA
+      InfCause[1:length(S),2] <- j*dt
+    }
     State[which(State[,j]==0),j+1] <- State[which(State[,j]==0),j] + pmax(1*Einf,1*Dinf)
     NewI <- which(State[,j+1] - State[,j] == 1)
-    dailyI[[j+1]] <- length(NewI)
+    dailyI[[j+1]] <- size(NewI,1)
     }else{
       break
     }
-  }
+}
 
 
-dailyI <- sum(matrix(dailyI,nrow = 1/dt, ncol = Nt*dt))
+
+dailyI <- colSums(matrix(dailyI,nrow = 1/dt, ncol = Nt*dt))
 TotInf <- colSums(Infectiousness)
 
 Cs <- colSums(C[,])
