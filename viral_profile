@@ -1,4 +1,65 @@
+ viral_profile<- function(ParVp,N,Ndays,dt){
+  tau<- seq(from=0,to=Ndays, by=dt)
+  
+  #locate parameters for in-host dynamics
+  Vp=ParVp[, 1:2]
+  tp=ParVp[, 3:4]
+  lg=ParVp[, 5:6]
+  ld=ParVp[, 7:8]
+  Tc=ParVp[, 9:10]
+  rho=ParVp[, 11]
+  
+  #randomly generate a sample number
+  
+  samp <- sample(nrow(Vp), 1)
+  
+  #calculate Vp
+  mean_vector <- c(tp[samp, 1], Tc[samp, 1])
+  covariance_matrix <- matrix(c(tp[samp, 2]^2, rho[samp] * tp[samp, 2] * Tc[samp, 2],
+                                rho[samp] * tp[samp, 2] * Tc[samp, 2], Tc[samp, 2]^2), 
+                              nrow = 2, ncol = 2)
+  
+  Ti <- exp(mvrnorm(N, mean_vector, covariance_matrix))
+  Vpi <- exp(rgamma(N, Vp[samp, 1], Vp[samp, 1]/Vp[samp, 2]))
+  gammadi <- rgamma(N, ld[samp, 1], ld[samp, 1]/ld[samp, 2])
+  gammagi <- rgamma(N, lg[samp, 1], lg[samp, 1]/lg[samp,2])
+  
+  #Create list object to mitigate lack of array broadcasting
+  
+  Ti_list <- lapply(1:length(tau), function(x)Ti)
+  Ti_combined <- do.call(rbind, Ti_list)
+  Ti_set<-matrix(Ti_combined[,1],nrow = N, ncol=length(Ti_combined[,1])/N)[,1]
+  Ti_factor<-matrix(data=NA,nrow=length(Ti_set),ncol=length(tau))
+  growth<-matrix(data=NA,nrow=nrow(Ti_factor),ncol=ncol(Ti_factor))
+  decay<-matrix(data=NA,nrow=nrow(Ti_factor),ncol=ncol(Ti_factor))
+  VPcom<-matrix(data=NA,nrow(growth),ncol=ncol(growth))
  
+   for(i in tau){
+    index<-which(tau==i)
+    Ti_factor[,index]<-i-Ti_set
+  }
+  
+  for(i in gammagi){
+    index<-which(gammagi==i)
+    growth[index,]<-exp(-i*Ti_factor[index,])
+  }
+  
+  for(i in gammadi){
+    index<-which(gammadi==i)
+    decay[index,]<-exp(i*Ti_factor[index,])
+  }
+  
+  for(i in Vpi){
+    index<-which(Vpi==i)
+    VPcom[index,]<-2*Vpi[index]/(growth[index,]+decay[index,])
+  }
+  
+  viral_profiles <- list(VP = VPcom, Ti = Ti, samp = samp)
+  return(viral_profiles)
+}
+
+
+
   #randomly generate a sample number
   
   samp <- sample(nrow(Vp), 1)
