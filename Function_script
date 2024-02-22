@@ -1,0 +1,215 @@
+###Function script
+
+##Libraries necessary to run model
+
+library("EnvStats")
+library("ismev")
+library("evd")
+library("mclust")
+library("R.matlab")
+library("MASS")
+library("pracma")
+
+########################Load Parameters from Ellis et al.#######################
+Load_parameters<-function(dataset){
+  
+  if (dataset == 0) {
+    #Load data for priors
+    varload <- readMat("Your//path//SimplePhenomModel_VirusDynOnly_MCMCSamples.mat")
+    Vp <- rbind(varload$ParSamp[[1]][[1]][,61:62], varload$ParSamp[[2]][[1]][, 61:62])
+    tp <- rbind(varload$ParSamp[[1]][[1]][, 63:64], varload$ParSamp[[2]][[1]][, 63:64])
+    lg <- rbind(varload$ParSamp[[1]][[1]][, 65:66], varload$ParSamp[[2]][[1]][, 65:66])
+    ld <- rbind(varload$ParSamp[[1]][[1]][, 67:68], varload$ParSamp[[2]][[1]][, 67:68])
+    Tc <- c(varload$ParSamp[[1]][[1]][, 69], varload$ParSamp[[2]][[1]][, 69])
+    sTc <- c(varload$ParSamp[[1]][[1]][, 70], varload$ParSamp[[2]][[1]][, 70])
+    rho <- c(varload$ParSamp[[1]][[1]][, 71], varload$ParSamp[[2]][[1]][, 71])
+    
+    varload <- readMat("Your//Path//EnvTrans_SimpleModel21_MCMCSamples.mat")
+    alpha <- rbind(exp(varload$ParSamp[[3]][[1]][,76:79]), exp(varload$ParSamp[[3]][[1]][,76:79]))
+    delta <- rbind(exp(varload$ParSamp[[3]][[1]][,80:83]), exp(varload$ParSamp[[3]][[1]][,80:83]))
+    betaE <- rbind(as.data.frame(exp(varload$ParSamp[[3]][[1]][,84])),as.data.frame(exp(varload$ParSamp[[3]][[1]][,84])))
+    
+    varload <- readMat("Your//Path//SimpleWithinHostModelToo2_NF_MCMCSamples.mat")
+    betaD <- exp(c(varload$ParSamp[[1]][[1]][,ncol(varload$ParSamp[[1]][[1]])-3], varload$ParSamp[[2]][[1]][,ncol(varload$ParSamp[[1]][[1]])-3]))/log(10)
+    
+    ParVp <- data.frame(Vp,tp,lg,ld,Tc,sTc,rho)
+    ParTr <- data.frame(betaD,betaE,alpha,delta)
+    
+    Ni0prior <- rep(1,20000)
+  } else if (dataset < 6) {
+    priorframe<-readMat("Your//Path//PosteriorDistributions.mat")
+    Pars=priorframe$Post[,,dataset]
+    ParVp=Pars[,1:11]
+    ParTr=Pars[,12:(ncol(Pars))]
+    Ni0prior=priorframe$Ni0post[,1,dataset]
+  } else if (dataset == 6){ #Load data for A=1 scenario for farm 1
+    priorscenario6<-readMat("Your//Path//Posteriors_A1_farm1.mat")
+    Pars <- c(priorscenario6$Theta[[length(priorscenario6$Theta)]], priorscenario6$Theta[[length(priorscenario6$Theta)]])
+    ParVp <- Pars[[1]][, 1:11]
+    ParTr <- Pars[[1]][, 12:ncol(Pars[[1]])]
+    Ni0prior <- c(priorscenario6$Ni0[,ncol(priorscenario6$Ni0)], priorscenario6$Ni0[,ncol(priorscenario6$Ni0)])
+  }
+  load_output_list<-list(ParVp=ParVp,ParTr=ParTr,Ni0prior=Ni0prior)
+  return(load_output_list)
+}
+
+
+########################Viral Profiles##########################################
+
+viral_profile<- function(ParVp,N,Ndays,dt){
+  tau<- seq(from=0,to=Ndays, by=dt)
+  
+  #locate parameters for in-host dynamics
+  Vp=ParVp[, 1:2]
+  tp=ParVp[, 3:4]
+  lg=ParVp[, 5:6]
+  ld=ParVp[, 7:8]
+  Tc=ParVp[, 9:10]
+  rho=ParVp[, 11]
+  
+  #randomly generate a sample number
+  
+  samp <- sample(nrow(Vp), 1)
+  
+  #calculate Vp
+  mean_vector <- c(tp[samp, 1], Tc[samp, 1])
+  covariance_matrix <- matrix(c(tp[samp, 2]^2, rho[samp] * tp[samp, 2] * Tc[samp, 2],
+                                rho[samp] * tp[samp, 2] * Tc[samp, 2], Tc[samp, 2]^2), 
+                              nrow = 2, ncol = 2)
+  
+  Ti <- exp(mvrnorm(N, mean_vector, covariance_matrix))
+  Vpi <- exp(rgamma(N, Vp[samp, 1], Vp[samp, 1]/Vp[samp, 2]))
+  gammadi <- rgamma(N, ld[samp, 1], ld[samp, 1]/ld[samp, 2])
+  gammagi <- rgamma(N, lg[samp, 1], lg[samp, 1]/lg[samp,2])
+  
+  #Create list object to mitigate lack of array broadcasting
+  
+  Ti_list <- lapply(1:length(tau), function(x)Ti)
+  Ti_combined <- do.call(rbind, Ti_list)
+  Ti_set<-matrix(Ti_combined[,1],nrow = N, ncol=length(Ti_combined[,1])/N)[,1]
+  Ti_factor<-matrix(data=NA,nrow=length(Ti_set),ncol=length(tau))
+  growth<-matrix(data=NA,nrow=nrow(Ti_factor),ncol=ncol(Ti_factor))
+  decay<-matrix(data=NA,nrow=nrow(Ti_factor),ncol=ncol(Ti_factor))
+  VPcom<-matrix(data=NA,nrow(growth),ncol=ncol(growth))
+  
+  for(i in tau){
+    index<-which(tau==i)
+    Ti_factor[,index]<-i-Ti_set
+  }
+  
+  for(i in gammagi){
+    index<-which(gammagi==i)
+    growth[index,]<-exp(-i*Ti_factor[index,])
+  }
+  
+  for(i in gammadi){
+    index<-which(gammadi==i)
+    decay[index,]<-exp(i*Ti_factor[index,])
+  }
+  
+  for(i in Vpi){
+    index<-which(Vpi==i)
+    VPcom[index,]<-2*Vpi[index]/(growth[index,]+decay[index,])
+  }
+  
+  viral_profiles <- list(VP = VPcom, Ti = Ti, samp = samp)
+  return(viral_profiles)
+}
+
+##################Transmission Model (Direct+Environmental)#####################
+
+Transmission_model<-function(N, Ndays, dt, ParTr, Ni0, E0, VP, Ti, Esize){
+  #Parameters from data
+  
+  Nt=Ndays/dt #Number of time steps
+  
+  #Contamination parameters
+  beta <- ParTr[1, 1]
+  betaE <- ParTr[1, 2]
+  alpha <- ParTr[1, 3:6]
+  delta <- ParTr[1, 7:10]
+  
+  #Initialisation
+  #Initialise vectors and matrices
+  Ni <- matrix (data = 0, nrow = Nt, ncol = 1)
+  V <- matrix (data = 0, nrow = N, ncol = Nt + 1)
+  Infectiousness<- matrix(data = 0, nrow = N, ncol = Nt+1)
+  State <- matrix(data = 0, nrow = N, ncol = Nt)
+  E <- matrix(data = 0, nrow = Nt + 1, ncol = 4)
+  E[1,] <- E0
+  State[1:Ni0, 1] <- matrix(1, nrow = 1, ncol = Ni0)
+  C <- matrix(data = 0, nrow = N, ncol = Nt)
+  InfCause <- matrix (data = 0, nrow = N, ncol = 2)
+  dailyI <- matrix(data = 0, nrow = Nt, ncol = 1)
+  NewI <- 1:Ni0
+  dailyI[1] <- 1
+  ProbE <- matrix(data = NaN, nrow = Nt, ncol = 1)
+  ProbD <- matrix(data = NaN, nrow = Nt, ncol = 1)
+  
+  #Time loop
+  for (j in 1:Nt){
+    #Identify and count susceptible and infected animals
+    S <- as.matrix(State[which(State[,j]==0),j])
+    Ns <- size(S,1)
+    Infd <- as.matrix(State[which(State[,j]==1),j])
+    Ni[[j]] <- size(Infd,1)
+    State[,j+1] <- State[,j]
+    
+    #For newly infected animals, calculate their viral titre in each compartment
+    #and their shedding profile from day of infection to the end of the simulation
+    if (dailyI[j]>0){
+      for (i in t(NewI)){
+        V[i, (j:(Nt + 1))] <- VP[ i, 1:(Nt-j+2)]
+        C[i,(j+ceiling(V_profile_list[[1]]$Ti[i,2]/dt)):(Nt)] <- 1
+      }
+      #Infectiousness is assumed to be proportional to log titre
+      Infectiousness[NewI,] <- pmax(0,log(V[NewI,]))
+    }
+    
+    #Calculate environmental contamination - 0.56 accounts for unit conversion
+    
+    E[j+1,] = E[j,] - delta*dt*E[j,] + alpha*dt*sum(pmax(0,log(0.56*V[,j])))/Esize
+    
+    #New infections
+    if ((Ni[[j]])<N & (j<Nt-1)){ #If there are still uninfected animals in the herd
+      
+      #Environmental transmission (homogenous for each type of contamination)
+      ProbE[[j]] <- 1-exp(-betaE*dt*sum((E[j+1,])+E[j,])/2)
+      Einf <- runif(Ns) < ProbE[[j]]
+      #Direct transmission
+      ProbD[[j]] <- 1 - exp(-beta*dt*(mean((Infectiousness[,j+1]+Infectiousness[,j])/2)))
+      Dinf <- runif(Ns) < ProbD[[j]] #Generate new infections of susceptible animals
+      
+      #Record the route of infection and time
+      if(length(2*Einf+Dinf)>0){
+        InfCause[1:size(S,1),1] <- 2*Einf+Dinf # 1=direct, 2=environmental, 3=both
+        InfCause[1:length(S),2] <- j*dt
+      }else{
+        InfCause[1:size(S,1),1]<-NA
+        InfCause[1:length(S),2] <- j*dt
+      }
+      State[which(State[,j]==0),j+1] <- State[which(State[,j]==0),j] + pmax(1*Einf,1*Dinf)
+      NewI <- which(State[,j+1] - State[,j] == 1)
+      dailyI[[j+1]] <- size(NewI,1)
+    }else{
+      break
+    }
+  }
+  
+  
+  
+  dailyI <- colSums(matrix(dailyI,nrow = 1/dt, ncol = Nt*dt))
+  TotInf <- colSums(Infectiousness)
+  
+  Cs <- colSums(C[,])
+  if(sum(Cs) > 0){
+    Cfirst <- which(Cs>=1)[1]
+  }else{
+    Cfirst <- NaN
+  }
+  transmission_list<-list(E=E,Cs=Cs,Cfirst=Cfirst,Ni=Ni,TotInf=TotInf,
+                          dailyI=dailyI,InfCause=InfCause,Infectiousness=Infectiousness,
+                          ProbE=ProbE,ProbD=ProbD)
+  
+  return(transmission_list)
+}
